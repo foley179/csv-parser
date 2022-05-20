@@ -37,6 +37,7 @@ function getFileNames(&$fileName, &$uniqueFileName, $argv) {
 
 function main($fileName, $uniqueFileName) {
   try {
+    // TODO: here i'll check file extension, if tsv use " " delimiter etc.
     $data;
 
     if (($data = fopen($fileName, "r")) !== false) { // open file
