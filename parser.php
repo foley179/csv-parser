@@ -2,9 +2,8 @@
 
 // cmd input eg:
 // parser.php --file products_comma_separated.csv --unique-combinations=combination_count.csv
-// should create file with count for each unique combination
-
-include "linkedList.php";
+// should show readable row for each item
+// then create file with count for each unique combination
 
 // ----- functions
 function getFileNames(&$fileName, &$uniqueFileName, $argv) {
@@ -39,13 +38,14 @@ function getFileNames(&$fileName, &$uniqueFileName, $argv) {
 function main($fileName, $uniqueFileName) {
   try {
     $data;
-    $uniqueList = new LinkedList();
 
     if (($data = fopen($fileName, "r")) !== false) { // open file
       $firstRow = true; // used to capture headers
       $row = 1; // used for item dividers
       $headers = [];
-
+      $oldObj = []; // for adding to file
+      $count = 1;
+      
       while (($line = fgetcsv($data, 1000, ",")) !== false) { // while a row is present
 
         // check brand_name and model_name exist
@@ -57,42 +57,44 @@ function main($fileName, $uniqueFileName) {
           // add "count" header, create file with headers
           $temp = $line;
           array_push($temp, "count");
-          $uniqueList->addNode(implode(",", $temp));
-        }
-        
-        $obj = [];
-        $count = 0;
-        
-        
-        if (!$firstRow) {
-          // add to linkedList
-          $uniqueList->addNode(implode(",", $line));
-          
+          addToFile($uniqueFileName, $temp, 0, true);
+        } else {
           // create a divider for each item
           echo "\nitem #$row\n";
           $row++;
         }
 
+        // compare current line to old obj
+        if ($line == $oldObj) {
+          $count++;
+        } else if($row > 2) {
+          // if current line does not match, add to file
+          addToFile($uniqueFileName, $oldObj, $count);
+          $count = 1;
+        }
+
         /* on first iteration store headers in an array,
-        on every other iteration, add line to object, print line, increment its count */
+        on every other iteration, add line to object, print line, increment its index (for headers) */
+        $index = 0;
         foreach ($line as $item) { // for each item in row
           if ($firstRow) {
             $newHeader = preg_replace('/_name/', "", $item);
             $newHeader = preg_replace('/_/', " ", $newHeader);
-            $headers[$count] = $newHeader;
+            $headers[$index] = $newHeader;
           } else {  
-            $obj[$headers[$count]] = $item;
-            echo "$headers[$count] = $item\n"; // print each row
+            $oldObj[$index] = $item; // add to obj
+            echo "$headers[$index] = $item\n"; // print each row
           }
-          $count++;
+          $index++;
         }
 
         if ($firstRow) {
           $firstRow = false;
-          continue;
         }
 
       }
+      // add last row
+      addToFile($uniqueFileName, $oldObj, $count);
     }
 
   } catch (\Throwable $err) {
@@ -100,32 +102,23 @@ function main($fileName, $uniqueFileName) {
   }
 
   fclose($data);
-
-  // add uniques to file
-  addToFile($uniqueFileName, $uniqueList);
 }
 
-function addToFile($fileName, $list) {
+function addToFile($fileName, $data, $count, $isHeaders = false) {
   // create csv file with unique combination counts
-  $current = $list->head;
-  $firstRow = true;
+  $mode = $isHeaders ? "w" : "a";
   
-  $currentFile = fopen($fileName, "w");
+  $currentFile = fopen($fileName, $mode);
   
-  while ($current != null) {
-    $data = $current->readData();
-    $count = $current->readCount();
+  $data = implode(",", $data);
 
-    if (!$firstRow) {
-      fwrite($currentFile, "$data,$count\n");
+  if (!$isHeaders) {
+    fwrite($currentFile, "$data,$count\n");
 
-    } else {
-      // first row is headers, no need for count
-      fwrite($currentFile, "$data\n");
-      $firstRow = false;
-    }
-
-    $current = $current->next;
+  } else {
+    // first row is headers, no need for count
+    fwrite($currentFile, "$data\n");
+    $firstRow = false;
   }
 
   fclose($currentFile);
